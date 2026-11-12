@@ -64,7 +64,7 @@ namespace BibleReader.Library.Downloads
             var coversPath = Settings.Current.BookCoversPath;
             Directory.CreateDirectory(coversPath);
 
-            var newest = new DirectoryInfo(coversPath).EnumerateFiles("*:*", SearchOption.AllDirectories)
+            var newest = new DirectoryInfo(coversPath).EnumerateFiles("*.*", SearchOption.AllDirectories)
                 .Select(file => (DateTime?)file.LastWriteTimeUtc)
                 .Max() ?? DateTime.MinValue;
 

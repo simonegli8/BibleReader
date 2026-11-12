@@ -28,6 +28,32 @@ public partial class OnlineBibleItem : ObservableObject
     OnlineBiblesView View { get; set; }
     public InstallableBook Bible { get; }
 
+    private Avalonia.Media.Imaging.Bitmap? _cover;
+    private bool _coverLoaded;
+
+    /// <summary>
+    /// The cover of the Bible (<see cref="InstallableBook.Image"/> is the path of its file), decoded small. It is
+    /// loaded when the row first asks for it, so only the rows that are shown cost anything; null if there is none.
+    /// </summary>
+    public Avalonia.Media.Imaging.Bitmap? Cover
+    {
+        get
+        {
+            if (!_coverLoaded)
+            {
+                _coverLoaded = true;
+                try
+                {
+                    if (!string.IsNullOrEmpty(Bible.Image) && File.Exists(Bible.Image))
+                        using (var stream = File.OpenRead(Bible.Image))
+                            _cover = Avalonia.Media.Imaging.Bitmap.DecodeToWidth(stream, 96);
+                }
+                catch (Exception) { /* a broken image file: the row has no cover */ }
+            }
+            return _cover;
+        }
+    }
+
     public string Description =>
         string.Join(" · ", new[] { Bible.LanguageEnglishName, Bible.Language, Bible.CountryName, Bible.Origin }
             .Where(s => !string.IsNullOrWhiteSpace(s)).Distinct());
