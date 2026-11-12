@@ -148,9 +148,9 @@ namespace BibleReader.Library.Downloads
                         .Select(img =>
                         {
                             var filename = Path.GetFileNameWithoutExtension(img);
-                            var name = Regex.Replace(filename, "[0-9]+$", "");
+                            var name = Regex.Replace(filename, @"\s*[0-9]+$", "");
                             int year = 0, bookyear = 0, bookyearen = 0;
-                            int.TryParse(Regex.Replace(filename, ".?(?=[0-9]+$)", ""), out year);
+                            int.TryParse(Regex.Replace(filename, @".?(?=[0-9]+$)", ""), out year);
 
                             if (book.EnglishName.Contains(name) || book.Name.Contains(name))
                             {
