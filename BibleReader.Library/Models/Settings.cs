@@ -63,6 +63,7 @@ namespace BibleReader.Library
                 Directory.CreateDirectory(field);
             }
         }
+        public string BookCoversPath => Path.Combine(ConfigPath, "Book-Covers");
 
         [JsonIgnore]
         public static Settings Current { get; private set; } = new Settings();

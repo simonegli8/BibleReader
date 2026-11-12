@@ -311,6 +311,7 @@ public partial class OnlineBiblesView : UserControl
         try
         {
             var bibles = await Task.Run(LoadSourcesAsync);
+            await BibliaLibreBible.GetImagesAsync(bibles);
             _items = bibles.Select(b => new OnlineBibleItem(b, this)).ToList();
             FillLanguages();
             FillClasses();
