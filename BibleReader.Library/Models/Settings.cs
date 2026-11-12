@@ -116,6 +116,7 @@ namespace BibleReader.Library
             return JsonConvert.SerializeObject(this, new JsonSerializerSettings()
             {
                 TypeNameHandling = TypeNameHandling.Auto,
+                Converters = [ new StringEnumConverter(), new VersionConverter() ]
             });
         }
 
@@ -158,7 +159,7 @@ namespace BibleReader.Library
                 var settings = JsonConvert.DeserializeObject<Settings>(json, new JsonSerializerSettings()
                 {
                     TypeNameHandling = TypeNameHandling.Auto,
-                    Converters = new List<JsonConverter> { new VersionConverter(), new StringEnumConverter() },
+                    Converters = [ new VersionConverter(), new StringEnumConverter() ],
                     Formatting = Formatting.Indented
                 });
                 Bibles = settings.Bibles;
