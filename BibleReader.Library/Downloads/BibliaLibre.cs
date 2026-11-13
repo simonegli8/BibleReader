@@ -1,14 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using BibleMarkdown;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Linq;
+using System;
+using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
-using BibleMarkdown;
+using System.Threading.Tasks;
 
 namespace BibleReader.Library.Downloads
 {
@@ -68,34 +68,35 @@ namespace BibleReader.Library.Downloads
                 .Select(file => (DateTime?)file.LastWriteTimeUtc)
                 .Max() ?? DateTime.MinValue;
 
-            string[] index = Array.Empty<string>();
             try
             {
-                index = JsonConvert.DeserializeObject<string[]>(await Download.DownloadStringAsync(ImagesIndexUrl));
-                var zips = index
-                    .Select(file => new
-                    {
-                        Time = DateTime.ParseExact(
-                            Regex.Match(file, @"^covers\.since\.(?<time>[0-9]+-[0-9]+-[0-9]+_[0-9]+-[0-9]+-[0-9]+).zip$").Groups["time"].Value,
-                                "yyyy-MM-dd_HH-mm-ss", CultureInfo.InvariantCulture),
-                        File = ImagesUrl + "/" + file
+                var indexJson = await Download.DownloadStringAsync(ImagesIndexUrl);
+                var zips = JsonConvert.DeserializeObject<string[]>(indexJson)
+                    .Select(file => {
+                        if (Publisher.CoverZipName.Match(file) is { Success: true } match) {
+                            return new
+                            {
+                                Time = Publisher.ParseCoverDate(match.Groups["time"].Value),
+                                File = ImagesUrl + "/" + file
+                            };
+                        } else return null;
                     })
-                    .Where(file => file.Time >= newest); // only select new zips that we have not downloaded yet
+                    .Where(file => file != null && file.Time >= newest); // only select new zips that we have not downloaded yet
                 var tempPath = Path.Combine(coversPath, ".temp");
                 var downloaders = zips
-                    .Select(zip => Download.DownloadFileAndUnzipAsync(zip.File, Path.GetTempFileName() + ".zip", Path.Combine(tempPath, $"covers.since.{zip.Time.ToString("yyyy-MM-dd_HH-mm-ss")}")));
+                    .Select(zip => Download.DownloadFileAndUnzipAsync(zip.File, Path.GetTempFileName() + ".zip", Path.Combine(tempPath, $"covers.upto.{zip.Time.ToString("yyyy-MM-dd_HH-mm-ss")}")));
                 await Task.WhenAll(downloaders);
-                foreach (var zipdir in Directory.EnumerateDirectories(tempPath)
+                foreach (var tempzipdir in Directory.EnumerateDirectories(tempPath)
                     .OrderBy(path => path))
                 {
-                    var files = Directory.EnumerateFiles(zipdir, "*.*", SearchOption.AllDirectories);
+                    var files = Directory.EnumerateFiles(tempzipdir, "*.*", SearchOption.AllDirectories);
                     foreach (var file in files)
                     {
-                        var relativePath = Path.GetRelativePath(zipdir, file);
+                        var relativePath = Path.GetRelativePath(tempzipdir, file);
                         var name = Path.GetFileName(file);
                         if (name.StartsWith("~"))
                         {
-                            var fileToDelete = Path.Combine(coversPath, Path.GetDirectoryName(relativePath), name.Substring(1));
+                            var fileToDelete = Path.Combine(coversPath, Path.GetDirectoryName(relativePath)!, name.Substring(1));
                             if (File.Exists(fileToDelete)) File.Delete(fileToDelete);
                         }
                         else
@@ -105,6 +106,7 @@ namespace BibleReader.Library.Downloads
                         }
                     }
                 }
+                Directory.Delete(tempPath, true);
             }
             catch (Exception)
             {
