@@ -9,6 +9,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
@@ -22,13 +23,13 @@ namespace BibleReader.Library.Downloads
     /// </summary>
     public class BibliaLibreBible : InstallableBook
     {
-        public const string Url = "https://biblia-del-pueblo.github.io/books";
-        public const string ImagesUrl = "https://biblia-del-pueblo.github.io/book-covers";
+        public const string Url = "https://biblia-del-pueblo.github.io/BibliaLibre/books";
+        public const string ImagesUrl = "https://biblia-del-pueblo.github.io/BibliaLibre/book-covers";
 
         const string IndexUrl = Url + "/index.json";
         const string ImagesIndexUrl = ImagesUrl + "/index.json";
 
-        public override string Origin => "BibliaLibre";
+        public override string Origin => "Biblia Libre";
         protected virtual string DetailsUrl { get; set; }
 
         /// <summary>
@@ -133,7 +134,7 @@ namespace BibleReader.Library.Downloads
                 }
             }
         }
-
+        static readonly Regex CodeFolder = new(@"^[a-z]{2,3}(?:-[A-Z]{2,3})?$");
         public static async Task GetImagesAsync(IEnumerable<InstallableBook> books)
         {
             await UpdateBookCoversAsync();
@@ -151,14 +152,14 @@ namespace BibleReader.Library.Downloads
 
             foreach (var book in books)
             {
-                var bfolders = folders
-                .Where(f => book.Language.Contains(f.Name) ||
-                    book.EnglishName.Contains(f.Name) ||
-                    book.LanguageCode.Contains(f.Name) ||
-                    Regex.IsMatch(f.Name, @"[a-z]{2,3}-[A-Z]{2,3}") && f.Name.Contains(book.LanguageCode));
-                var folder = bfolders
-                    .FirstOrDefault();
-                if (folder != null)
+                var lang = book.LanguageCode?.Split('-')[0];   // read once per book
+
+                var bfolders = folders.Where(f => (CodeFolder.IsMatch(f.Name) && lang != null)
+                    ? f.Name.Split('-')[0].Equals(lang, StringComparison.OrdinalIgnoreCase)
+                    : f.Name.Equals(book.LanguageEnglishName, StringComparison.OrdinalIgnoreCase) ||
+                      f.Name.Equals(book.Language, StringComparison.OrdinalIgnoreCase)); 
+                
+                foreach (var folder in bfolders)
                 {
                     int bookyear = 0, bookyearen = 0;
                     var m = Regex.Match(book.Name, "[0-9]{4}");
@@ -167,15 +168,18 @@ namespace BibleReader.Library.Downloads
                     if (men.Success) bookyearen = int.Parse(men.Value);
                     bookyear = Math.Max(bookyear, bookyearen);
 
-                    book.Image = Directory.EnumerateFiles(folder.Path, "*:*", SearchOption.AllDirectories)
+                    book.Image = Directory.EnumerateFiles(folder.Path, "*.*", SearchOption.AllDirectories)
                         .Select(img =>
                         {
                             var filename = Path.GetFileNameWithoutExtension(img);
-                            var name = Regex.Replace(filename, @"\s*[0-9]+$", "");
-                            int year = 0, bookyear = 0, bookyearen = 0;
-                            int.TryParse(Regex.Replace(filename, @".?(?=[0-9]+$)", ""), out year);
+                            var name = Regex.Replace(filename, @"-|\s*[0-9]{4}$", "");
+                            // TryParse sets year to 0 on failure, so a file without a year must be kept as "any year" explicitly.
+                            int year = int.TryParse(Regex.Replace(filename, @"^.*?(?=[0-9]{4}$)", ""), out var parsed) ? parsed : int.MaxValue;
 
-                            if (book.EnglishName.Contains(name) || book.Name.Contains(name))
+                            // Compare composed (NFC) so "ü" matches whether the file name stores it as one char or u + diaeresis.
+                            name = name.Normalize(NormalizationForm.FormC);
+                            if (book.EnglishName.Normalize(NormalizationForm.FormC).Contains(name) ||
+                                book.Name.Normalize(NormalizationForm.FormC).Contains(name))
                             {
                                 return new
                                 {
@@ -186,11 +190,14 @@ namespace BibleReader.Library.Downloads
                             else return null;
                         })
                         .Where(img => img != null)
-                        .OrderBy(img => img.Year)
-                        .FirstOrDefault(img => img.Year >= bookyear)
+                        .OrderBy(img => img!.Year)
+                        .FirstOrDefault(img => img!.Year >= bookyear)
                         ?.Image;
+                    if (book.Image != null) break;
                 }
-                else book.Image = null;
+
+                // no cover found: one is made (an SVG as a data address), the same one for the same book
+                if (book.Image == null || Path.GetFileNameWithoutExtension(book.Image).StartsWith("-")) book.Image = CoverFallback.Create(book);
             }
         }
 
@@ -207,7 +214,7 @@ namespace BibleReader.Library.Downloads
                 if (!Directory.EnumerateFiles(ConfigPath, "*.md").Any() &&
                     !Directory.EnumerateFiles(ConfigPath, "*.db").Any())
                     throw new InvalidDataException("The Bible was downloaded, but it has no books.");
-                transform.Index.Create();
+                transform.Index.Create(LanguageCode);
                 Directory.Delete(srcpath, true);
             });
         }

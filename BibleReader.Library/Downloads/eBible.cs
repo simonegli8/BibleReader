@@ -14,7 +14,7 @@ public class eBible : InstallableBook
 {
     const string Url = "https://ebible.org/find";
 
-    public override string Origin => "eBible";
+    public override string Origin => "ebible.org";
     public override Classes Class { get => InstallableBook.Classes.Bible; }
     protected virtual string DetailsUrl { get; set; }
     static async Task<string> GetListAsync() => await Download.DownloadStringAsync(Url);
@@ -78,7 +78,7 @@ public class eBible : InstallableBook
             transform.Import.FromSWORD(true);
             transform.Import.ImportBookNames();
             transform.Import.PostprocessMarkdown();
-            transform.Index.Create();
+            transform.Index.Create(LanguageCode);
 
             Directory.Delete(srcpath, true);
         });

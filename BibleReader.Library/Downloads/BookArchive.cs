@@ -86,7 +86,7 @@ namespace BibleReader.Library.Downloads
                     var transform = new Transform(path, src);
                     transform.Import.Postprocess = PostprocessMarkdownSmallCaps;
                     transform.Import.All();
-                    transform.Index.Create();
+                    transform.Index.Create(LanguageCode);
                     Directory.Delete(src, true);
                 });
             }

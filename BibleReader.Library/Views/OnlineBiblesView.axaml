@@ -10,8 +10,13 @@
         <DataTemplate x:Key="BibleRow" x:DataType="local:OnlineBibleItem">
             <Grid ColumnDefinitions="Auto,*,Auto" Margin="4">
                 <!-- The cover of the Bible, if one was found (BibliaLibreBible.GetImagesAsync). -->
-                <Image Source="{Binding Cover}" Width="40" Height="56" Stretch="Uniform" Margin="0,0,8,0"
-                       VerticalAlignment="Center" IsVisible="{Binding Cover, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                <Image Source="{Binding Cover}" Width="80" Height="112" Stretch="Uniform" Margin="0,0,8,0"
+                       VerticalAlignment="Center" IsVisible="{Binding Cover, Converter={x:Static ObjectConverters.IsNotNull}}">
+                    <!-- Hovering the cover pops it up at three times the size (80x112 -> 240x336). -->
+                    <ToolTip.Tip>
+                        <Image Source="{Binding Cover}" Width="240" Height="336" Stretch="Uniform" />
+                    </ToolTip.Tip>
+                </Image>
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                     <TextBlock Text="{Binding Bible.Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
                     <TextBlock Text="{Binding Description}" FontSize="{loc:Size 12}" Opacity="0.7" TextWrapping="Wrap" />

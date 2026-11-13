@@ -23,7 +23,7 @@ namespace BibleReader.Library
         internal const string Host = "https://crosswire.org";
         const string ListUrl = Host + "/sword/modules/ModDisp.jsp?modType=";
 
-        public override string Origin => "CrossWire";
+        public override string Origin => "crosswire.org";
         protected virtual string DetailsUrl { get; set; }
         protected virtual string CrossWireModuleUrl { get; set; }
         public override InstallableBook.Classes Class => InstallableBook.Classes.Bible;
@@ -134,7 +134,7 @@ namespace BibleReader.Library
                 transform.Import.FromSWORD(true);
                 transform.Import.ImportBookNames();
                 transform.Import.PostprocessMarkdown();
-                transform.Index.Create();
+                transform.Index.Create(LanguageCode);
                 Directory.Delete(srcpath, true);
             });
             if (!IsImported)
@@ -159,7 +159,7 @@ namespace BibleReader.Library
     public class CrossWireDictionary: CrossWireBook, IStrongDictionary, IDisposable
     {
         const string Url = "https://crosswire.org/sword/modules";
-        public override string Origin => "CrossWire";
+        public override string Origin => "crosswire.org";
         public override InstallableBook.Classes Class => InstallableBook.Classes.Dictionary;
         public bool IsEnabled
         {

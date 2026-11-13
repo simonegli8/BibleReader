@@ -28,14 +28,39 @@ public partial class OnlineBibleItem : ObservableObject
     OnlineBiblesView View { get; set; }
     public InstallableBook Bible { get; }
 
-    private Avalonia.Media.Imaging.Bitmap? _cover;
+    private Avalonia.Media.IImage? _cover;
     private bool _coverLoaded;
+    private static bool _fontsAdded;
 
     /// <summary>
-    /// The cover of the Bible (<see cref="InstallableBook.Image"/> is the path of its file), decoded small. It is
-    /// loaded when the row first asks for it, so only the rows that are shown cost anything; null if there is none.
+    /// Gives the three files of the Bible Roman font to the renderer of the SVG: it looks fonts up in the system only,
+    /// so without this the generated covers (<see cref="CoverFallback"/>) show a serif of the system unless the font is installed.
     /// </summary>
-    public Avalonia.Media.Imaging.Bitmap? Cover
+    private static void AddFonts()
+    {
+        if (_fontsAdded) return;
+        _fontsAdded = true;
+        foreach (var file in new[] { "BibleRoman", "BibleRomanBold", "BibleRomanItalic" })
+        {
+            try
+            {
+                using var asset = Avalonia.Platform.AssetLoader.Open(new Uri($"avares://BibleReader.Library/Assets/{file}.ttf"));
+                var data = new MemoryStream();
+                asset.CopyTo(data);
+                data.Position = 0;
+                Avalonia.Svg.Skia.SvgSource.s_skiaModel.Settings.TypefaceProviders.Insert(0,
+                    new Svg.Skia.TypefaceProviders.CustomTypefaceProvider(data, 0));
+            }
+            catch (Exception) { /* no such font file: the serif of the system is used */ }
+        }
+    }
+
+    /// <summary>
+    /// The cover of the Bible (<see cref="InstallableBook.Image"/> is the path of its file), a bitmap decoded small or
+    /// an SVG (drawn as vectors, so sharp at any size). It is loaded when the row first asks for it, so only the rows
+    /// that are shown cost anything; null if there is none.
+    /// </summary>
+    public Avalonia.Media.IImage? Cover
     {
         get
         {
@@ -44,9 +69,20 @@ public partial class OnlineBibleItem : ObservableObject
                 _coverLoaded = true;
                 try
                 {
-                    if (!string.IsNullOrEmpty(Bible.Image) && File.Exists(Bible.Image))
-                        using (var stream = File.OpenRead(Bible.Image))
-                            _cover = Avalonia.Media.Imaging.Bitmap.DecodeToWidth(stream, 96);
+                    var generated = CoverFallback.FromDataUri(Bible.Image);
+                    if (generated != null)
+                    {
+                        AddFonts();
+                        _cover = new Avalonia.Svg.Skia.SvgImage { Source = Avalonia.Svg.Skia.SvgSource.LoadFromSvg(generated) };
+                    }
+                    else if (!string.IsNullOrEmpty(Bible.Image) && File.Exists(Bible.Image))
+                    {
+                        if (Path.GetExtension(Bible.Image).Equals(".svg", StringComparison.OrdinalIgnoreCase))
+                            _cover = new Avalonia.Svg.Skia.SvgImage { Source = Avalonia.Svg.Skia.SvgSource.Load(Bible.Image, null) };
+                        else
+                            using (var stream = File.OpenRead(Bible.Image))
+                                _cover = Avalonia.Media.Imaging.Bitmap.DecodeToWidth(stream, 360);
+                    }
                 }
                 catch (Exception) { /* a broken image file: the row has no cover */ }
             }
