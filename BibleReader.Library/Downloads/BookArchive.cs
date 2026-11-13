@@ -22,7 +22,7 @@ namespace BibleReader.Library.Downloads
         // with "HN"), and the small caps go around the whole word: "[Lord_H3068_&lemma_%morph]{.smallcaps}", which the
         // reader reads as a small caps run that holds a word with a Strong's number.
         static readonly Regex SmallCapsPattern = new(
-            @"(?<!(^|\r?\n)#[^\r\n]*?)(?:(?<strongs>" + BookText.StrongsWord + @")|[A-Z][A-Z]+)",
+            @"(?<!(^|\r?\n)#[^\r\n]*?)(?:(?<strongs>" + BookText.StrongsWord + @")|\p{Lu}{2,})",
             RegexOptions.Singleline | RegexOptions.Compiled);
 
         static readonly Regex StrongsAttributePart = new(@"^(?:[GH][0-9]+|&.+|%.+)$", RegexOptions.Compiled);
@@ -40,7 +40,7 @@ namespace BibleReader.Library.Downloads
         {
             var parts = token.Split('_');
             var words = parts.Where(p => !StrongsAttributePart.IsMatch(p)).ToList();
-            bool hasCapitals = words.Any(w => Regex.IsMatch(w, "^[A-Z][A-Z]+$") && !IsRomanNumberOrIsbn(w));
+            bool hasCapitals = words.Any(w => Regex.IsMatch(w, @"^\p{Lu}{2,}$") && !IsRomanNumberOrIsbn(w));
             if (!hasCapitals || words.Any(w => w.Any(char.IsLower))) return token; // no capitals, or mixed: not all small caps
             return "[" + string.Join('_', parts.Select(p => StrongsAttributePart.IsMatch(p) ? p : Capitalize(p))) + "]{.smallcaps}";
         }
