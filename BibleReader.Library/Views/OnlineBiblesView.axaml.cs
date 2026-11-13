@@ -400,7 +400,7 @@ public partial class OnlineBiblesView : UserControl
         {
             async () => await eBible.GetBiblesAsync(),
             async () => await CrossWireBook.GetBiblesAsync(),
-            async () => await BibliaLibreBible.GetBiblesAsync(),
+            async () => await BibliaLibreBible.GetBooksAsync(),
             async () => await CrossWireDictionary.GetStrongsDictionariesAsync(),
         };
         var results = await Task.WhenAll(sources.Select(async load =>
