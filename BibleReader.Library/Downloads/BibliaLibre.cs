@@ -1,9 +1,11 @@
-﻿using BibleMarkdown;
+﻿using Avalonia.Markup.Xaml.Templates;
+using BibleMarkdown;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -64,35 +66,42 @@ namespace BibleReader.Library.Downloads
             var coversPath = Settings.Current.BookCoversPath;
             Directory.CreateDirectory(coversPath);
 
-            var newest = new DirectoryInfo(coversPath).EnumerateFiles("*.*", SearchOption.AllDirectories)
-                .Select(file => (DateTime?)file.LastWriteTimeUtc)
-                .Max() ?? DateTime.MinValue;
-
+            var tempPath = Path.Combine(coversPath, ".temp");
             try
             {
+                if (Directory.Exists(tempPath)) Directory.Delete(tempPath, true);
+
+                var newest = new DirectoryInfo(coversPath).EnumerateFiles("*.*", SearchOption.AllDirectories)
+                    .Select(file => (DateTime?)file.LastWriteTimeUtc)
+                    .Max() ?? DateTime.MinValue;
+
                 var indexJson = await Download.DownloadStringAsync(ImagesIndexUrl);
                 var zips = JsonConvert.DeserializeObject<string[]>(indexJson)
-                    .Select(file => {
-                        if (Publisher.CoverZipName.Match(file) is { Success: true } match) {
+                    .Select(file =>
+                    {
+                        if (Publisher.CoverZipName.Match(file) is { Success: true } match)
+                        {
+                            var time = Publisher.ParseCoverDate(match.Groups["time"].Value);
                             return new
                             {
-                                Time = Publisher.ParseCoverDate(match.Groups["time"].Value),
-                                File = ImagesUrl + "/" + file
+                                Time = time,
+                                File = ImagesUrl + "/" + file,
+                                TempDir = Path.Combine(tempPath, $"covers.upto.{time.ToString("yyyy-MM-dd_HH-mm-ss")}")
                             };
-                        } else return null;
+                        }
+                        else return null;
                     })
-                    .Where(file => file != null && file.Time >= newest); // only select new zips that we have not downloaded yet
-                var tempPath = Path.Combine(coversPath, ".temp");
+                    .Where(file => file != null && file.Time >= newest)
+                    .OrderBy(z => z.Time).ToList(); // only select new zips that we have not downloaded yet
                 var downloaders = zips
-                    .Select(zip => Download.DownloadFileAndUnzipAsync(zip.File, Path.GetTempFileName() + ".zip", Path.Combine(tempPath, $"covers.upto.{zip.Time.ToString("yyyy-MM-dd_HH-mm-ss")}")));
+                    .Select(zip => Download.DownloadFileAndUnzipAsync(zip.File, Path.GetTempFileName() + ".zip", zip.TempDir));
                 await Task.WhenAll(downloaders);
-                foreach (var tempzipdir in Directory.EnumerateDirectories(tempPath)
-                    .OrderBy(path => path))
+                foreach (var zip in zips)
                 {
-                    var files = Directory.EnumerateFiles(tempzipdir, "*.*", SearchOption.AllDirectories);
+                    var files = Directory.EnumerateFiles(zip.TempDir, "*.*", SearchOption.AllDirectories);
                     foreach (var file in files)
                     {
-                        var relativePath = Path.GetRelativePath(tempzipdir, file);
+                        var relativePath = Path.GetRelativePath(zip.TempDir, file);
                         var name = Path.GetFileName(file);
                         if (name.StartsWith("~"))
                         {
@@ -102,14 +111,26 @@ namespace BibleReader.Library.Downloads
                         else
                         {
                             var fileToCopy = Path.Combine(coversPath, relativePath);
+                            Directory.CreateDirectory(Path.GetDirectoryName(fileToCopy)!);
                             File.Copy(file, fileToCopy, true);
+                            File.SetLastWriteTimeUtc(fileToCopy, zip.Time);
                         }
                     }
                 }
-                Directory.Delete(tempPath, true);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                Debug.WriteLine(ex);
+            }
+            finally
+            {
+                try
+                {
+                    if (Directory.Exists(tempPath)) Directory.Delete(tempPath, true);
+                }
+                catch (Exception ex) {
+                    Debug.WriteLine(ex);
+                }
             }
         }
 
